@@ -26,6 +26,11 @@ dependencies = [
     "pytest-httpserver>=1.0",    # mock HTTP server for webhooks
 ]
 
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["config*", "utils*"]
+exclude = ["tests*", "pages*", "reports*"]
+
 [project.optional-dependencies]
 dev = [
     "black>=24.0",
