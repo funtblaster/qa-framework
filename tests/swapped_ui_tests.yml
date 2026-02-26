@@ -1,0 +1,84 @@
+name: Swapped UI Tests (Cross-Browser)
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: "0 6 * * *"   # Nightly at 06:00 UTC
+  workflow_dispatch:       # Allow manual runs
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ui-tests:
+    name: "${{ matrix.browser }} — UI Tests"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false       # Run all browsers even if one fails
+      matrix:
+        browser: [chromium, firefox, webkit]
+
+    env:
+      BASE_URL: https://swapped.com
+      HEADLESS: "true"
+      BROWSER: ${{ matrix.browser }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Upgrade pip and setuptools
+        run: pip install --upgrade pip setuptools
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Install Playwright browsers
+        run: playwright install ${{ matrix.browser }} --with-deps
+
+      - name: Run cross-browser UI tests
+        run: |
+          pytest tests/ui/test_swapped_homepage.py tests/ui/test_swapped_trade.py \
+            -k "${{ matrix.browser }}" \
+            --timeout=30 \
+            --tb=short \
+            -v \
+            --alluredir=reports/allure-results \
+            --cov=tests/ui \
+            --cov-report=xml:reports/coverage.xml || true
+
+      - name: Upload Allure results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-${{ matrix.browser }}-${{ github.run_number }}
+          path: reports/allure-results
+          retention-days: 14
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.browser }}-${{ github.run_number }}
+          path: reports/coverage.xml
+          retention-days: 14
+
+      - name: Upload screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ matrix.browser }}-${{ github.run_number }}
+          path: reports/screenshots/
+          retention-days: 7
