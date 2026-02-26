@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "qa-framework"
+version = "0.1.0"
+description = "Generic QA Automation Framework — Pytest + Playwright + httpx"
+requires-python = ">=3.11"
+dependencies = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-xdist>=3.5",         # parallel execution
+    "pytest-cov>=5.0",           # coverage
+    "pytest-rerunfailures>=13",  # auto-retry flaky tests
+    "pytest-timeout>=2.3",       # per-test timeout
+    "allure-pytest>=2.13",       # allure reporting
+    "playwright>=1.44",          # UI automation
+    "httpx>=0.27",               # async-capable HTTP client
+    "pydantic>=2.7",             # schema validation
+    "pydantic-settings>=2.3",    # env-based config
+    "faker>=25.0",               # test data generation
+    "factory-boy>=3.3",          # model factories
+    "python-dotenv>=1.0",        # .env loading
+    "tenacity>=8.3",             # retry logic
+    "pytest-httpserver>=1.0",    # mock HTTP server for webhooks
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=24.0",
+    "ruff>=0.4",
+    "mypy>=1.10",
+    "pre-commit>=3.7",
+]
+
+[tool.pytest.ini_options]
+# see pytest.ini for full config — keeping both in sync
+asyncio_mode = "auto"
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "W", "I"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
