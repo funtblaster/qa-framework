@@ -22,3 +22,44 @@ jobs:
       HEADLESS: "true"
     steps:
       - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Upgrade pip and setuptools
+        run: pip install --upgrade pip setuptools
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+      - name: Install Playwright browsers
+        run: playwright install chromium --with-deps
+      - name: Run smoke & P0 tests
+        env:
+          BASE_URL: ${{ secrets.STAGING_BASE_URL || 'http://localhost:3000' }}
+          API_BASE_URL: ${{ secrets.STAGING_API_BASE_URL || 'http://localhost:3000' }}
+        run: |
+          pytest -m "smoke or p0" \
+            -n auto \
+            --timeout=60 \
+            --tb=short \
+            --alluredir=reports/allure-results \
+            --cov=utils \
+            --cov=config \
+            --cov-report=xml:reports/coverage.xml \
+            --ignore=tests/ui \
+            --ignore=tests/api
+      - name: Upload Allure results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-pr-${{ github.run_number }}
+          path: reports/allure-results
+          retention-days: 7
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-pr-${{ github.run_number }}
+          path: reports/coverage.xml
+          retention-days: 7
