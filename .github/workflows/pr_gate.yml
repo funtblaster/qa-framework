@@ -45,6 +45,12 @@ jobs:
       - name: Install Playwright browsers
         run: playwright install chromium --with-deps
 
+      - name: Run tests
+        env:
+            BASE_URL: http://localhost:3000
+            API_BASE_URL: http://localhost:3000
+          run: pytest -m "smoke or p0"
+
       - name: Run smoke & P0 tests
         run: |
           pytest -m "smoke or p0" \
