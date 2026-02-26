@@ -1,0 +1,77 @@
+name: Nightly Regression
+
+on:
+  schedule:
+    - cron: "0 2 * * *"   # 02:00 UTC every night
+  workflow_dispatch:        # allow manual trigger
+
+jobs:
+  regression:
+    name: Full Regression Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      TEST_ENV: staging
+      BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+      API_BASE_URL: ${{ secrets.STAGING_API_BASE_URL }}
+      TEST_USERNAME: ${{ secrets.STAGING_TEST_USERNAME }}
+      TEST_PASSWORD: ${{ secrets.STAGING_TEST_PASSWORD }}
+      API_TOKEN: ${{ secrets.STAGING_API_TOKEN }}
+      HEADLESS: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Install Playwright browsers
+        run: playwright install chromium firefox --with-deps
+
+      - name: Run full regression suite
+        run: |
+          pytest \
+            -n auto \
+            --timeout=120 \
+            --tb=short \
+            --alluredir=reports/allure-results \
+            --cov=utils \
+            --cov=config \
+            --cov-report=xml:reports/coverage.xml \
+            --cov-report=html:reports/coverage-html
+
+      - name: Upload Allure results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-nightly-${{ github.run_number }}
+          path: reports/allure-results
+          retention-days: 30
+
+      - name: Upload coverage HTML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html-${{ github.run_number }}
+          path: reports/coverage-html
+          retention-days: 30
+
+      - name: Notify on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "❌ Nightly regression failed: ${{ github.repository }} — <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
