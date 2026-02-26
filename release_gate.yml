@@ -1,0 +1,72 @@
+name: Release Gate
+
+# Run this before promoting any build to production.
+# Trigger manually or via a release tag.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to validate"
+        required: true
+        default: "staging"
+        type: choice
+        options: [staging, production]
+
+jobs:
+  release-smoke:
+    name: Release Smoke — ${{ inputs.environment || 'staging' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    environment:
+      name: ${{ inputs.environment || 'staging' }}   # uses GitHub Environments for approval gates
+
+    env:
+      TEST_ENV: ${{ inputs.environment || 'staging' }}
+      BASE_URL: ${{ secrets.BASE_URL }}
+      API_BASE_URL: ${{ secrets.API_BASE_URL }}
+      TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
+      TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+      API_TOKEN: ${{ secrets.API_TOKEN }}
+      HEADLESS: "true"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Install Playwright
+        run: playwright install chromium --with-deps
+
+      - name: Run P0 smoke suite
+        run: |
+          pytest -m "p0 or smoke" \
+            -n auto \
+            --timeout=60 \
+            --tb=long \
+            --junitxml=reports/junit-release.xml \
+            --alluredir=reports/allure-results
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-results-${{ github.run_number }}
+          path: |
+            reports/
+          retention-days: 90       # keep release artifacts longer
+
+      - name: Block release on failure
+        if: failure()
+        run: |
+          echo "::error::Release gate failed — P0/smoke tests did not pass. Deployment blocked."
+          exit 1
