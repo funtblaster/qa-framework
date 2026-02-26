@@ -49,7 +49,7 @@ jobs:
             --cov-report=xml:reports/coverage.xml \
             --ignore=tests/ui \
             --ignore=tests/api
-            -p no:cacheprovider || exit 0
+            --p no:cacheprovider || exit 0
       - name: Upload Allure results
         if: always()
         uses: actions/upload-artifact@v4
